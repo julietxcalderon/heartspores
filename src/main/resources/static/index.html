@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heartspores</title>
+    <link rel="icon" type="image/png" href="assets/logo.png">
+</head>
+
+<body>
+    <nav>
+        <a href="#inicio">Inicio</a>
+        <a href="#productos">Productos</a>
+        <a href="#pedidos">Pedidos</a>
+    </nav>
+
+    <section id="inicio">
+        <h1 class="hero-title">HEARTSPORES</h1>
+
+        <div class="lore">
+            El fin está cerca, susurrado por vientos que arrastran el espejismo de lo que creímos real.<br/>
+            La tierra cruje bajo el peso de lo insaciable, mientras las sombras de lo perdido se alzan como fantasmas.<br/>
+            En escenarios vacíos, actores desfasados siguen representando un guión obsoleto, olvidando que su obra ya no conmueve ni engaña.<br/>
+            La oscuridad avanza, no como una amenaza, sino como una promesa que reclama su lugar en este acto final.<br/><br/>
+
+            La semilla persiste, enraizada en el profundo río de lo ancestral, donde el equilibrio entre lo sagrado y lo humano nunca fue olvidado.<br/>
+            La muerte danza sobre el fuego, reclamando lo que se disuelve y dejando en sus pasos las cenizas del renacimiento.<br/>
+            Veneramos a los guardianes de lo eterno, fundiéndonos con la luz de aquello que nunca morirá.<br/>
+            El mundo vive en nosotras y nosotras en él: ha llegado el momento de despertar.
+        </div>
+    </section>
+
+    <section id="crear-producto">
+        <h2>CREAR PRODUCTO</h2>
+
+        <form onsubmit="crearProducto(); return false;">
+            <input id="p-nombre" placeholder="Nombre">
+            <input id="p-descripcion" placeholder="Descripción">
+            <input id="p-precio" type="number" placeholder="Precio">
+            <input id="p-stock" type="number" placeholder="Stock">
+            <input id="p-categoria" placeholder="Categoría">
+            <input id="p-imagen" placeholder="URL Imagen">
+
+            <button type="submit">Crear</button>
+        </form>
+    </section>
+
+    <section id="productos">
+        <h2>PRODUCTOS</h2>
+        <div id="lista-productos"></div>
+    </section>
+
+    <section id="crear-pedido">
+        <h2>CREAR PEDIDO</h2>
+        <div id="productos-pedido"></div>
+        <br>
+        <button onclick="enviarPedido()">Crear Pedido</button>
+    </section>
+
+    <section id="pedidos">
+        <h2>PEDIDOS</h2>
+        <div id="lista-pedidos"></div>
+    </section>
+
+    <section id="modificar-pedido" style="display:none;">
+        <h2>MODIFICAR PEDIDO</h2>
+        <p>ID del Pedido: <strong id="edit-pedido-id"></strong></p>
+
+        <h3>Líneas del Pedido</h3>
+        <div id="edit-lineas"></div>
+
+        <h3>Agregar Producto</h3>
+        <div id="edit-productos-agregar"></div>
+
+        <br>
+        <button onclick="cancelarEdicion()">Cerrar</button>
+    </section>
+
+
+    <footer>
+        Julieta Calderon · #vlenv — 2025
+    </footer>
+
+</body>
+<script>
+const API = "/api";
+
+document.addEventListener("DOMContentLoaded", () => {
+    cargarProductos();
+    cargarProductosParaPedido();
+    cargarPedidos();
+});
+
+function errorUI(msg) {
+    alert("❌ ERROR: " + msg);
+}
+
+function okUI(msg) {
+    alert("✔ " + msg);
+}
+
+function leerNumero(id) {
+    const v = parseFloat(document.getElementById(id).value);
+    return isNaN(v) ? null : v;
+}
+
+function crearProducto() {
+
+    const nombre = document.getElementById("p-nombre").value.trim();
+    const descripcion = document.getElementById("p-descripcion").value.trim();
+    const precio = leerNumero("p-precio");
+    const stock = parseInt(document.getElementById("p-stock").value);
+    const categoria = document.getElementById("p-categoria").value.trim();
+    const imagenUrl = document.getElementById("p-imagen").value.trim();
+
+    if (nombre.length < 2) return errorUI("El nombre es demasiado corto.");
+    if (precio === null || precio <= 0) return errorUI("Precio inválido.");
+    if (isNaN(stock) || stock < 0) return errorUI("Stock inválido.");
+
+    const dto = { nombre, descripcion, precio, stock, categoria, imagenUrl };
+
+    fetch(`${API}/productos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dto)
+    })
+    .then(r => {
+        if (!r.ok) throw new Error("No se pudo crear el producto");
+        return r.json();
+    })
+    .then(() => {
+        okUI("Producto creado correctamente");
+        cargarProductos();
+        cargarProductosParaPedido();
+    })
+    .catch(err => errorUI(err.message));
+}
+
+function cargarProductos() {
+    fetch(`${API}/productos`)
+        .then(r => r.json())
+        .then(prods => {
+            if (prods.length === 0) {
+                document.getElementById("lista-productos").innerHTML =
+                    `<p style="opacity:0.7;text-align:center;">No hay productos cargados.</p>`;
+                return;
+            }
+
+            document.getElementById("lista-productos").innerHTML =
+                prods.map(p => `
+                    <div class="card">
+                        <h3>${p.nombre}</h3>
+                        <p>${p.descripcion || ""}</p>
+                        <p>Precio: $${p.precio}</p>
+                        <p>Stock: ${p.stock}</p>
+                        <button onclick="borrarProducto('${p.id}')">Eliminar</button>
+                    </div>
+                `).join("");
+        })
+        .catch(() => errorUI("Error cargando productos"));
+}
+
+function borrarProducto(id) {
+    if (!confirm("¿Eliminar este producto?")) return;
+
+    fetch(`${API}/productos/${id}`, { method: "DELETE" })
+        .then(() => {
+            okUI("Producto eliminado");
+            cargarProductos();
+            cargarProductosParaPedido();
+        })
+        .catch(() => errorUI("No se pudo eliminar el producto"));
+}
+
+let pedidoItems = [];
+
+function cargarProductosParaPedido() {
+    pedidoItems = [];
+
+    fetch(`${API}/productos`)
+        .then(r => r.json())
+        .then(productos => {
+            if (productos.length === 0) {
+                document.getElementById("productos-pedido").innerHTML =
+                    `<p style="opacity:0.7;text-align:center;">No hay productos disponibles.</p>`;
+                return;
+            }
+
+            document.getElementById("productos-pedido").innerHTML =
+                productos.map(p => `
+                    <div class="card mini">
+                        <strong>${p.nombre}</strong>
+                        <p>Stock: ${p.stock}</p>
+                        <input type="number" id="cant-${p.id}" placeholder="Cant.">
+                        <button onclick="addItem('${p.id}', '${p.nombre}')">+</button>
+                    </div>
+                `).join("");
+        });
+}
+
+function addItem(id, nombre) {
+    const cant = parseInt(document.getElementById(`cant-${id}`).value);
+
+    if (!cant || cant <= 0) return errorUI("Cantidad inválida");
+
+    pedidoItems.push({ productoId: id, cantidad: cant });
+
+    okUI(`${nombre} agregado al pedido`);
+}
+
+function enviarPedido() {
+    if (pedidoItems.length === 0) return errorUI("El pedido está vacío.");
+
+    fetch(`${API}/pedidos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: pedidoItems })
+    })
+    .then(r => {
+        if (!r.ok) throw new Error("No se pudo crear el pedido");
+        return r.json();
+    })
+    .then(() => {
+        okUI("Pedido creado correctamente");
+        pedidoItems = [];
+        cargarPedidos();
+        cargarProductosParaPedido();
+    })
+    .catch(e => errorUI(e.message));
+}
+
+function cargarPedidos() {
+    fetch(`${API}/pedidos`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.length === 0) {
+                document.getElementById("lista-pedidos").innerHTML =
+                    `<p style="opacity:0.7;text-align:center;">No hay pedidos registrados.</p>`;
+                return;
+            }
+
+            document.getElementById("lista-pedidos").innerHTML =
+                data.map(p => `
+                    <div class="card">
+                        <h3>Pedido ${p.id}</h3>
+                        <p>${p.fecha}</p>
+                        <p>Estado: ${p.estado}</p>
+                        <p>Total: $${p.total}</p>
+
+                        <button onclick="editarPedido('${p.id}')">Modificar</button>
+                        <button onclick="eliminarPedido('${p.id}')">Eliminar</button>
+                    </div>
+                `).join("");
+        })
+        .catch(() => errorUI("Error cargando pedidos"));
+}
+
+function eliminarPedido(id) {
+    if (!confirm("¿Eliminar definitivamente este pedido?")) return;
+
+    fetch(`${API}/pedidos/${id}/cancelar`, { method: "DELETE" })
+        .then(() => {
+            okUI("Pedido eliminado");
+            cargarPedidos();
+        })
+        .catch(() => errorUI("No se pudo eliminar el pedido"));
+}
+
+function editarPedido(id) {
+    document.getElementById("modificar-pedido").style.display = "block";
+    window.location.hash = "#modificar-pedido";
+    document.getElementById("edit-pedido-id").textContent = id;
+
+    fetch(`${API}/pedidos/${id}`)
+        .then(r => r.json())
+        .then(pedido => {
+
+            if (pedido.items.length === 0) {
+                document.getElementById("edit-lineas").innerHTML =
+                    `<p class="empty">Este pedido no tiene productos.</p>`;
+            } else {
+                document.getElementById("edit-lineas").innerHTML =
+                    pedido.items.map(lp => `
+                        <div class="card mini">
+                            <strong>${lp.producto.nombre}</strong>
+
+                            <input type="number" id="edit-${lp.producto.id}" value="${lp.cantidad}" min="0">
+
+                            <button onclick="actualizarCantidad('${id}','${lp.producto.id}')">
+                                Guardar
+                            </button>
+
+                            <button class="btn-red"
+                                onclick="eliminarLinea('${id}','${lp.producto.id}')">
+                                Quitar
+                            </button>
+                        </div>
+                    `).join("");
+            }
+
+            fetch(`${API}/productos`)
+                .then(r => r.json())
+                .then(prods => {
+
+                    if (prods.length === 0) {
+                        document.getElementById("edit-productos-agregar").innerHTML =
+                            `<p class="empty">No hay productos para agregar.</p>`;
+                        return;
+                    }
+
+                    document.getElementById("edit-productos-agregar").innerHTML =
+                        prods.map(p => `
+                            <div class="card mini">
+                                <strong>${p.nombre}</strong>
+                                <input type="number" id="add-${p.id}" placeholder="Cantidad">
+                                <button onclick="agregarProducto('${id}','${p.id}','${p.nombre}')">
+                                    Agregar
+                                </button>
+                            </div>
+                        `).join("");
+                });
+        });
+}
+
+function actualizarCantidad(pedidoId, productoId) {
+    const cantidad = parseInt(document.getElementById(`edit-${productoId}`).value);
+
+    if (cantidad < 0) return alert("Cantidad inválida");
+
+    fetch(`${API}/pedidos/${pedidoId}/linea/${productoId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cantidad })
+    }).then(r => {
+        if (r.ok) {
+            alert("Cantidad actualizada");
+            editarPedido(pedidoId);
+            cargarPedidos();
+            cargarProductos();
+        } else {
+            r.text().then(t => alert("Error: " + t));
+        }
+    });
+}
+
+function eliminarLinea(pedidoId, productoId) {
+    if (!confirm("¿Quitar este producto del pedido?")) return;
+
+    fetch(`${API}/pedidos/${pedidoId}/linea/${productoId}`, {
+        method: "DELETE"
+    }).then(() => {
+        alert("Producto eliminado");
+        editarPedido(pedidoId);
+        cargarProductos();
+    });
+}
+
+function agregarProducto(pedidoId, productoId, nombre) {
+    const cantidad = parseInt(document.getElementById(`add-${productoId}`).value);
+
+    if (!cantidad || cantidad < 1) {
+        alert("Cantidad inválida");
+        return;
+    }
+
+    fetch(`${API}/pedidos/${pedidoId}/agregar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productoId, cantidad })
+    }).then(r => {
+        if (r.ok) {
+            alert(`${nombre} agregado`);
+            editarPedido(pedidoId);
+            cargarProductos();
+        } else {
+            r.text().then(t => alert("Error: " + t));
+        }
+    });
+}
+
+function cancelarEdicion() {
+    document.getElementById("modificar-pedido").style.display = "none";
+}
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Handjet:wght@400;600;800&display=swap');
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Handjet", sans-serif;
+    background: #000814;
+    color: #d1d8d0;
+    background-image: url("assets/logo.png");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(2px);
+    z-index: -1;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+}
+
+nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(10, 20, 25, 0.7);
+    backdrop-filter: blur(6px);
+    padding: 15px 0;
+    border-bottom: 1px solid #243036;
+    text-align: center;
+}
+
+nav a {
+    margin: 0 15px;
+    color: #d1d8d0;
+    text-decoration: none;
+    font-size: 22px;
+    transition: 0.3s;
+}
+
+nav a:hover {
+    color: #89a197;
+    text-shadow: 0 0 8px #667972;
+}
+
+.hero-title {
+    text-align: center;
+    font-size: 7vw;
+    margin-top: 40px;
+    text-shadow: 0 0 20px #667972, 0 0 10px #020202;
+    animation: pulseText 5s infinite alternate;
+}
+
+.lore {
+    max-width: 900px;
+    margin: auto;
+    margin-top: 40px;
+    padding: 20px;
+    font-size: 2.8vw;
+    line-height: 1.5;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .lore { font-size: 4.5vw; }
+}
+
+@media (max-width: 480px) {
+    .lore { font-size: 6vw; }
+}
+
+section {
+    max-width: 800px;
+    margin: auto;
+    padding: 50px 20px;
+}
+
+.card {
+    background: rgba(10, 20, 25, 0.55);
+    padding: 18px 22px;
+    margin: 20px 0;
+    border-radius: 10px;
+    border: 1px solid #253238;
+}
+
+.card.mini {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    gap: 12px;
+}
+
+.card.mini input {
+    width: 70px;
+}
+
+nav a {
+    font-size: 20px;
+    padding: 6px 10px;
+}
+
+@media (max-width: 768px) {
+    section {
+        padding: 30px 15px;
+    }
+
+    .card.mini {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .card.mini input {
+        width: 100%;
+    }
+
+    button {
+        width: 100%;
+    }
+}
+
+.card:hover {
+    border-color: #667972;
+    transform: scale(1.02);
+}
+
+h1, h2, h3 {
+    text-shadow: 0 0 15px #667972, 0 0 10px #020202;
+    text-align: center;
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+    background: rgba(20, 25, 30, 0.6);
+    border: 1px solid #2b373c;
+    border-radius: 5px;
+    color: #d1d8d0;
+    font-size: 18px;
+}
+
+button {
+    background-color: #1a2a2f;
+    border: 1px solid #3c5158;
+    padding: 10px 20px;
+    color: #d1d8d0;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-top: 1rem;
+    font-size: 18px;
+    transition: 0.3s;
+}
+
+button:hover {
+    background-color: #314348;
+    transform: scale(1.05);
+}
+
+#modificar-pedido {
+    display: none;
+    padding: 30px 0;
+}
+
+.subtitulo {
+    text-align: center;
+    font-size: 28px;
+    margin-top: 20px;
+}
+
+footer {
+    text-align: center;
+    padding: 40px 0;
+    font-size: 20px;
+    opacity: 0.7;
+    margin-top: 60px;
+}
+
+.fade-in {
+    animation: fadeIn 1s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes pulseText {
+    0% { opacity: 0.7; letter-spacing: 2px; }
+    50% { opacity: 1; letter-spacing: 5px; }
+    100% { opacity: 0.85; letter-spacing: 3px; }
+}
+
+.card.mini {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    font-size: 16px;
+}
+
+.card.mini input {
+    width: 60px;
+}
+
+.card.mini button {
+    padding: 6px 10px;
+    font-size: 14px;
+}
+</style>
+</html>
