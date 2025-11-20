@@ -1,24 +1,39 @@
-HEARTSPORES — Proyecto Fullstack
+Heartspores — Proyecto Fullstack
 
-Heartspores es una pequeña aplicación fullstack que combina un backend en Spring Boot con un frontend liviano en HTML/CSS/JS.
+Heartspores es una aplicación fullstack simple que combina un backend en Spring Boot con un frontend ligero en HTML/CSS/JS. Permite gestionar productos y pedidos, manteniendo control de stock y estados básicos.
 
-Permite gestionar productos y pedidos, manteniendo el control de stock y un flujo básico de estados.
 
-Ejecutar
-./gradlew bootRun
+Tecnologías
 
-Página única (index.html)
+Backend: Java 21, Spring Boot, Spring Web, Spring Data JPA
 
-JS puro consumiendo la API
+Frontend: HTML, CSS, JavaScript
 
-Base de Datos
+Base de datos: MySQL (Railway)
 
-Se generan automáticamente:
+Deploy: Render (Docker) + Railway
 
-producto
 
-pedido
+Funcionalidades
 
-linea_pedido
+CRUD de productos
 
-Heartspores explora una estética mística y orgánica, con un diseño centrado y simple pensado para experimentar, crear y aprender.
+Manejo de stock
+
+Gestión de pedidos
+
+API REST conectada al frontend
+
+
+Arquitectura
+
+Frontend estático (index.html)
+
+Backend desplegado en Render
+
+BD MySQL en Railway
+
+
+Objetivo
+
+Un proyecto pequeño para practicar fullstack, despliegue en la nube y diseño de APIs.
