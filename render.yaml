@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: heartspores-api
+    env: docker
+    repo: https://github.com/julietxcalderon/heartspores
+    dockerfilePath: Dockerfile
+    plan: starter
+    region: Oregon
+    branch: main
+    autoDeploy: true
